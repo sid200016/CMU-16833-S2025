@@ -29,8 +29,7 @@ def create_linear_system(odoms, observations, sigma_odom, sigma_observation,
 
     n_odom = len(odoms)
     n_obs = len(observations)
-    print("n_odom", n_odom)
-    print("n_obs", n_obs)
+   
     M = (n_odom + 1) * 2 + n_obs * 2
     N = n_poses * 2 + n_landmarks * 2
 
@@ -50,7 +49,8 @@ def create_linear_system(odoms, observations, sigma_odom, sigma_observation,
     Hl = np.array([[-1, 0, 1,0], [0, -1, 0, 1]])
     for i in range(n_odom):
         A[2*(i+1):2*(i+2), 2*i:2*(i+2)] = sqrt_inv_odom@Ho
-        b[2*i:2*(i+1)] = sqrt_inv_odom@odoms[i]
+        b[2*(i+1):2*(i+2)] = sqrt_inv_odom@odoms[i]
+    # TODO: Then fill in landmark measurements
     for i in range(n_obs):
         pose= int(observations[i, 0])
         landmark = int(observations[i, 1])
@@ -58,8 +58,8 @@ def create_linear_system(odoms, observations, sigma_odom, sigma_observation,
         A[ 2*(n_odom+i+1):2*(n_odom + i+2), 2*pose:2*(pose+1)] = sqrt_inv_obs@Hl[0:2, 0:2]
         A[ 2*(n_odom+i+1):2*(n_odom + i+2), 2*n_poses+2*landmark:2*landmark + 2*(n_poses+1)] = sqrt_inv_obs@Hl[0:2, 2:4]
         b[2*(n_odom+i+1):2*(n_odom+i+2)] = sqrt_inv_obs@measurement
-    # TODO: Then fill in landmark measurements
-
+    
+  
     return csr_matrix(A), b
 
 

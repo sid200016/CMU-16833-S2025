@@ -4,7 +4,9 @@
 '''
 
 from scipy.sparse import csc_matrix, eye
+from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import inv, splu, spsolve, spsolve_triangular
+import sparseqr
 #from sparseqr import rz, permutation_vector_to_matrix, solve as qrsolve
 import numpy as np
 import matplotlib.pyplot as plt
@@ -54,8 +56,15 @@ def solve_qr(A, b):
     # TODO: return x, R s.t. Ax = b, and |Ax - b|^2 = |Rx - d|^2 + |e|^2
     # https://github.com/theNded/PySPQR
     N = A.shape[1]
-    x = np.zeros((N, ))
-    R = eye(N)
+
+    z, R, E, rank = sparseqr.rz(A, b, permc_spec = 'NATURAL')
+    
+    
+    R = csr_matrix(R)
+    x  =spsolve_triangular(R, z, lower = False)
+   
+    
+    #R = eye(N)
     return x, R
 
 
@@ -63,8 +72,11 @@ def solve_qr_colamd(A, b):
     # TODO: return x, R s.t. Ax = b, and |Ax - b|^2 = |R E^T x - d|^2 + |e|^2, with reordered QR decomposition (E is the permutation matrix).
     # https://github.com/theNded/PySPQR
     N = A.shape[1]
-    x = np.zeros((N, ))
-    R = eye(N)
+    z, R, E, rank = sparseqr.rz(A, b, permc_spec = 'COLAMD')
+    E = sparseqr.permutation_vector_to_matrix(E)
+    R = csr_matrix(R)
+    x  =spsolve_triangular(R, z.flatten(), lower = False)
+    x = E@x
     return x, R
 
 
