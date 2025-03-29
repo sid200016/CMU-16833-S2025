@@ -7,7 +7,7 @@ from scipy.sparse import csc_matrix, eye
 from scipy.sparse import csr_matrix
 from scipy.sparse import csc_array
 from scipy.sparse.linalg import inv, splu, spsolve, spsolve_triangular
-#import sparseqr
+import sparseqr
 #from sparseqr import rz, permutation_vector_to_matrix, solve as qrsolve
 import numpy as np
 import matplotlib.pyplot as plt
@@ -63,13 +63,14 @@ def solve_custom(A, b):
     Pc = csc_array((np.ones(N), (np.arange(N), B.perm_c)))
     z = np.zeros((N, ))
     #Solve Lz = y
-    y = A.T@b
+    y = Pr.T@A.T@b@Pc.T
     for i in range(N):
         L_current = L[i, i]
         sum = 0
         for j in range(i):
             sum += L[i, j] * z[j]
         z[i] = (y[i] - sum) / L_current
+    print(z)
     #Solve Ux = z
     x_perm = np.zeros((N, ))
     for i in range(N-1, -1, -1):
@@ -80,9 +81,10 @@ def solve_custom(A, b):
         x_perm[i] = (z[i] - sum) / U_current
     x = np.zeros((N, ))
     #x = Pc @ x_perm
-    x[c] = x_perm
-    print(x.shape)
-    return x, U
+    #x[c] = x_perm
+    print(x_perm)
+
+    return Pc@x_perm, U
 
 
 def solve_qr(A, b):
@@ -92,10 +94,10 @@ def solve_qr(A, b):
 
     z, R, E, rank = sparseqr.rz(A, b, permc_spec = 'NATURAL')
     
-    
+    z = z.flatten()
     R = csr_matrix(R)
     x  =spsolve_triangular(R, z, lower = False)
-   
+
     
     #R = eye(N)
     return x, R
