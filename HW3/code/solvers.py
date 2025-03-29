@@ -5,8 +5,9 @@
 
 from scipy.sparse import csc_matrix, eye
 from scipy.sparse import csr_matrix
+from scipy.sparse import csc_array
 from scipy.sparse.linalg import inv, splu, spsolve, spsolve_triangular
-import sparseqr
+#import sparseqr
 #from sparseqr import rz, permutation_vector_to_matrix, solve as qrsolve
 import numpy as np
 import matplotlib.pyplot as plt
@@ -50,6 +51,38 @@ def solve_lu_colamd(A, b):
     
     U = B.U
     return x, U
+def solve_custom(A, b):
+    N = A.shape[1]
+    B = splu(A.T@A, permc_spec='COLAMD')
+    L = B.L.toarray()
+    U = B.U.toarray()
+  
+    r = B.perm_r
+    c = B.perm_c
+    Pr = csc_array((np.ones(N), (B.perm_r, np.arange(N))))
+    Pc = csc_array((np.ones(N), (np.arange(N), B.perm_c)))
+    z = np.zeros((N, ))
+    #Solve Lz = y
+    y = A.T@b
+    for i in range(N):
+        L_current = L[i, i]
+        sum = 0
+        for j in range(i):
+            sum += L[i, j] * z[j]
+        z[i] = (y[i] - sum) / L_current
+    #Solve Ux = z
+    x_perm = np.zeros((N, ))
+    for i in range(N-1, -1, -1):
+        U_current = U[i, i]
+        sum = 0
+        for j in range(i+1, N):
+            sum += U[i, j] * x_perm[j]
+        x_perm[i] = (z[i] - sum) / U_current
+    x = np.zeros((N, ))
+    #x = Pc @ x_perm
+    x[c] = x_perm
+    print(x.shape)
+    return x, U
 
 
 def solve_qr(A, b):
@@ -90,7 +123,8 @@ def solve(A, b, method='default'):
 
     fn_map = {
         'default': solve_default,
-        'pinv': solve_pinv,
+        'custom': solve_custom,
+        'pinv': solve_pinv, 
         'lu': solve_lu,
         'qr': solve_qr,
         'lu_colamd': solve_lu_colamd,
