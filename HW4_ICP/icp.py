@@ -11,8 +11,11 @@ import matplotlib.pyplot as plt
 import argparse
 import transforms
 import o3d_utility
-
-
+import sparseqr
+from scipy.sparse import csc_matrix, eye
+from scipy.sparse import csr_matrix
+from scipy.sparse import csc_array
+from scipy.sparse.linalg import inv, splu, spsolve, spsolve_triangular
 def find_projective_correspondence(source_points,
                                    source_normals,
                                    target_vertex_map,
@@ -46,23 +49,12 @@ def find_projective_correspondence(source_points,
         T_source_points, intrinsic)
     target_us = np.round(target_us).astype(int)
     target_vs = np.round(target_vs).astype(int)
-    valid_bounds = target_us >= 0 & target_us < w & target_vs >= 0 & target_vs < h
-    valid_depth = target_ds > 0 and np.isfinite(target_ds)
-    valid_correspondences = []
-    for i in range(len(target_us)):
-        if not valid_bounds[i] or not valid_depth[i]:
-            continue
-        u = target_us[i]
-        v = target_vs[i]
-        vertex = target_vertex_map[v, u]
-        if not np.all(np.isfinite(vertex)):
-            continue
-        valid_correspondences.append(i)
+    mask = ((target_us >= 0) & (target_us < w) & (target_vs >= 0) & (target_vs < h) & (target_ds >= 0)).astype(bool)
+  
 
     # TODO: first filter: valid projection
 
-    mask = np.zeros_like(target_us).astype(bool)
-    mask[valid_correspondences] = True
+
 
     # End of TODO
 
@@ -72,19 +64,19 @@ def find_projective_correspondence(source_points,
     T_source_points = T_source_points[mask]
 
     # TODO: second filter: apply distance threshold
-    valid_correspondences2 = []
-    mask = np.zeros_like(target_us).astype(bool)
-    for i in range(len(target_us)):
-        u = target_us[i]
-        v = target_vs[i]
-        q = target_vertex_map[v, u]
-        p = T_source_points[i]
-        if np.linalg.norm(q - p) < dist_diff:
-            valid_correspondences2.append(i)
+    #valid_correspondences = []
+    # mask = np.zeros_like(target_us).astype(bool)
+    # for i in range(len(target_us)):
+    #     u = target_us[i]
+    #     v = target_vs[i]
+    #     q = target_vertex_map[v, u]
+    #     p = T_source_points[i]
+    #     if np.linalg.norm(p-q) < dist_diff:
+    #         valid_correspondences.append(i)
             
-    mask[valid_correspondences2] = True
-        
-
+    #mask[valid_correspondences] = True
+    q = target_vertex_map[target_vs, target_us]
+    mask = (np.linalg.norm(T_source_points  - q, axis = 1) < dist_diff).astype(bool)
         # Compute the distance difference
         
     # End of TODO
@@ -106,13 +98,18 @@ def build_linear_system(source_points, target_points, target_normals, T):
     p_prime = (R @ source_points.T + t).T
     q = target_points
     n_q = target_normals
-
+    print("q", q.shape)
+    print("p'", p_prime.shape)
+    print("n", n_q.shape)
     A = np.zeros((M, 6))
     b = np.zeros((M, ))
 
     # TODO: build the linear system
     # End of TODO
-
+    for i in range(M):
+        A[i, 0:3] = np.cross(p_prime[i], n_q[i].T)
+        A[i, 3:6] = n_q[i].T
+        b[i] =  n_q[i].T@(p_prime[i] - q[i])
     return A, b
 
 
@@ -158,7 +155,11 @@ def solve(A, b):
     \return delta (6, ) vector by solving the linear system. You may directly use dense solvers from numpy.
     '''
     # TODO: write your relevant solver
-    return np.zeros((6, ))
+    Q,R = np.linalg.qr(A)
+    Qt_b = Q.T@(-b)
+    x = np.linalg.solve(R, Qt_b)
+    return x
+
 
 
 def icp(source_points,
