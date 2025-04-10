@@ -46,9 +46,24 @@ def find_projective_correspondence(source_points,
         T_source_points, intrinsic)
     target_us = np.round(target_us).astype(int)
     target_vs = np.round(target_vs).astype(int)
+    valid_bounds = target_us >= 0 & target_us < w & target_vs >= 0 & target_vs < h
+    valid_depth = target_ds > 0 and np.isfinite(target_ds)
+    valid_correspondences = []
+    for i in range(len(target_us)):
+        if not valid_bounds[i] or not valid_depth[i]:
+            continue
+        u = target_us[i]
+        v = target_vs[i]
+        vertex = target_vertex_map[v, u]
+        if not np.all(np.isfinite(vertex)):
+            continue
+        valid_correspondences.append(i)
 
     # TODO: first filter: valid projection
+
     mask = np.zeros_like(target_us).astype(bool)
+    mask[valid_correspondences] = True
+
     # End of TODO
 
     source_indices = source_indices[mask]
@@ -57,7 +72,21 @@ def find_projective_correspondence(source_points,
     T_source_points = T_source_points[mask]
 
     # TODO: second filter: apply distance threshold
+    valid_correspondences2 = []
     mask = np.zeros_like(target_us).astype(bool)
+    for i in range(len(target_us)):
+        u = target_us[i]
+        v = target_vs[i]
+        q = target_vertex_map[v, u]
+        p = T_source_points[i]
+        if np.linalg.norm(q - p) < dist_diff:
+            valid_correspondences2.append(i)
+            
+    mask[valid_correspondences2] = True
+        
+
+        # Compute the distance difference
+        
     # End of TODO
 
     source_indices = source_indices[mask]
