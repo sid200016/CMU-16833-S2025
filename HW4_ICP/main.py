@@ -105,4 +105,5 @@ if __name__ == '__main__':
     pos_est = T_est[:, :3, 3]
     ax.plot3D(pos_gt[:, 0], pos_gt[:, 1], pos_gt[:, 2])
     ax.plot3D(pos_est[:, 0], pos_est[:, 1], pos_est[:, 2])
+    plt.savefig("traj_plot.png")
     plt.show()

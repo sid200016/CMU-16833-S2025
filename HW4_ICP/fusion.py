@@ -35,6 +35,14 @@ class Map:
         \param t translation from camera (input) to world (map), (3, )
         \return None, update map properties IN PLACE
         '''
+        
+        points_world = (R@points.T+t).T
+        normal_world = (R@normals.T).T
+        self.points[indices] = (self.points[indices]*self.weights[indices] + points_world) /(self.weights[indices] + 1)
+        self.normals[indices] = (self.normals[indices]*self.weights[indices] + normal_world)/(1+self.weights[indices])
+        self.colors[indices] = (self.colors[indices]*self.weights[indices] + colors)/(1+self.weights[indices])
+        self.weights[indices] += 1  
+        self.normals[indices] /= np.linalg.norm(self.normals[indices], axis = 1, keepdims = True)
         pass
 
     def add(self, points, normals, colors, R, t):
@@ -48,6 +56,14 @@ class Map:
         \param t translation from camera (input) to world (map), (3, )
         \return None, update map properties by concatenation
         '''
+        points_world = (R@points.T+t).T
+        normal_world = (R@normals.T).T
+        
+        self.points = np.append(self.points, points_world, axis = 0)
+        
+        self.normals = np.append(self.normals, normal_world, axis = 0)
+        self.colors = np.append(self.colors, colors, axis = 0)
+        self.weights = np.append(self.weights, np.ones((len(points), 1)), axis = 0)
         pass
 
     def filter_pass1(self, us, vs, ds, h, w):
@@ -61,7 +77,8 @@ class Map:
         \param w Width of the image projected to
         \return mask (N, 1) in bool indicating the valid coordinates
         '''
-        return np.zeros_like(us)
+        mask = ((us >= 0) & (us < w) & (vs >= 0) & (vs < h) & (ds >= 0)).astype(bool)
+        return mask
 
     def filter_pass2(self, points, normals, input_points, input_normals,
                      dist_diff, angle_diff):
@@ -76,7 +93,13 @@ class Map:
         \param angle_diff Angle difference threshold to filter correspondences by normals
         \return mask (N, 1) in bool indicating the valid correspondences
         '''
-        return np.zeros((len(points)))
+        m1 = (np.linalg.norm(points - input_points, axis=1) < dist_diff)  
+        n1 = normals/np.linalg.norm(normals, axis=1, keepdims = True)
+        n2 = input_normals/np.linalg.norm(input_normals, axis=1, keepdims = True)
+        angles = np.arccos(np.clip(np.sum(n1*n2, axis = 1), -1, 1))
+        m2 = (angles < angle_diff)
+        mask = (m1 & m2).astype(bool)
+        return mask
 
     def fuse(self,
              vertex_map,
@@ -124,7 +147,11 @@ class Map:
             us, vs, ds = transforms.project(T_points, intrinsic)
             us = np.round(us).astype(int)
             vs = np.round(vs).astype(int)
-
+            ## Naive Addition
+            #points = vertex_map.reshape((-1, 3))
+            #normals = normal_map.reshape((-1, 3))
+            #colors = color_map.reshape((-1, 3))
+            ## Done
             # TODO: first filter: valid projection
             mask = self.filter_pass1(us, vs, ds, h, w)
             # Should not happen -- placeholder before implementation
@@ -142,7 +169,7 @@ class Map:
             valid_normals = normal_map[vs, us]
 
             # TODO: second filter: apply thresholds
-            mask = self.filter_pass2(T_points, R_normals, valid_points,
+            mask = self.filter_pass2(T_points, R_normals, valid_points, 
                                      valid_normals, dist_diff, angle_diff)
             # Should not happen -- placeholder before implementation
             if mask.sum() == 0:

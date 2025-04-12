@@ -220,11 +220,11 @@ if __name__ == '__main__':
     parser.add_argument('--source_idx',
                         type=int,
                         help='index to the source depth/normal maps',
-                        default=10)
+                        default=70)
     parser.add_argument('--target_idx',
                         type=int,
                         help='index to the source depth/normal maps',
-                        default=50)
+                        default=100)
     args = parser.parse_args()
 
     intrinsic_struct = o3d.io.read_pinhole_camera_intrinsic('intrinsics.json')
